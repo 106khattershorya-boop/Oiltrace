@@ -29,7 +29,7 @@ def _priority_level(score: float) -> PriorityLevel:
 def _build_reasons(evidence: VesselEvidence) -> List[str]:
     reasons = []
 
-    if evidence.spatial_temporal_score >= SPATIAL_ANOMALY_THRESHOLD:
+    if evidence.combined_score >= SPATIAL_ANOMALY_THRESHOLD:
         reasons.append("Strong spatial and temporal match")
 
     if evidence.speed_anomaly:
@@ -72,7 +72,7 @@ def _build_reasons(evidence: VesselEvidence) -> List[str]:
 def score_vessel(evidence: VesselEvidence) -> VesselPriority:
 
     available = {
-        "spatial_temporal": evidence.spatial_temporal_score,
+        "spatial_temporal": evidence.combined_score,
         "behaviour": evidence.behaviour_score,
     }
 
@@ -100,7 +100,7 @@ def score_vessel(evidence: VesselEvidence) -> VesselPriority:
         final_priority_score=final_score,
         priority_level=_priority_level(final_score),
         reasons=_build_reasons(evidence),
-        spatial_temporal_score=evidence.spatial_temporal_score,
+        combined_score=evidence.combined_score,
         behaviour_score=evidence.behaviour_score,
         spectral_score=evidence.spectral_score,
         cargo_score=evidence.cargo_score,

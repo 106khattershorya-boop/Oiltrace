@@ -7,7 +7,7 @@ class VesselEvidence(BaseModel):
     mmsi: str
     vessel_name: str
 
-    spatial_temporal_score: float
+    combined_score: float
     distance_km: float
     time_diff_minutes: float
 

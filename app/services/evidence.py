@@ -24,7 +24,7 @@ def fuse_evidence(incident: SpillIncident) -> List[VesselEvidence]:
             VesselEvidence(
                 mmsi=candidate.mmsi,
                 vessel_name=candidate.vessel_name,
-                spatial_temporal_score=candidate.spatial_temporal_score,
+                combined_score=candidate.combined_temporal_score,
                 distance_km=candidate.distance_km,
                 time_diff_minutes=candidate.time_diff_minutes,
                 behaviour_score=behaviour.behaviour_score,

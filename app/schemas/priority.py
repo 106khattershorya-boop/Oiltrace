@@ -18,7 +18,7 @@ class VesselPriority(BaseModel):
     priority_level: PriorityLevel
     reasons: list[str]
 
-    spatial_temporal_score: float
+    combined_score: float
     behaviour_score: float
     spectral_score: float | None = None
     cargo_score: float | None = None

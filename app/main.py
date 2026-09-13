@@ -10,7 +10,8 @@ from app.routers import (
     evidence,
     priority,
     investigation,
-    cargo
+    cargo,
+    ml_analysis
 )
 
 
@@ -29,6 +30,7 @@ app.include_router(evidence.router)
 app.include_router(priority.router)
 app.include_router(investigation.router)
 app.include_router(cargo.router)
+app.include_router(ml_analysis.router)
 
 @app.get("/")
 def read_root():

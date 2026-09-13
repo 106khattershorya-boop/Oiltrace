@@ -1,10 +1,9 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Search,
   Filter,
   Eye,
   MapPin,
-  CalendarDays,
   Satellite,
   ChevronRight,
   Activity,

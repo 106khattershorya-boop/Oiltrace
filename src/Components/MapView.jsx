@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
   MapContainer,
@@ -13,18 +13,12 @@ import {
 } from "react-leaflet";
 
 import {
-  Activity,
-  Navigation,
   Radar,
   Radio,
   Satellite,
   ShieldAlert,
   Ship,
   Target,
-  Waves,
-  Zap,
-  Crosshair,
-  LocateFixed,
   Layers3,
 } from "lucide-react";
 
@@ -195,7 +189,7 @@ function AnimatedDriftPath({ visible }) {
       {/* Forecast points */}
 
       {points.slice(1).map((point, index) => (
-        <React.Fragment key={`forecast-${index}`}>
+        <Fragment key={`forecast-${index}`}>
           <CircleMarker
             center={point}
             radius={7}
@@ -223,7 +217,7 @@ function AnimatedDriftPath({ visible }) {
               </strong>
             </Tooltip>
           </CircleMarker>
-        </React.Fragment>
+        </Fragment>
       ))}
     </>
   );
@@ -281,7 +275,7 @@ function VesselRoutes({ visible }) {
   return (
     <>
       {routes.map((route, index) => (
-        <React.Fragment key={`route-${index}`}>
+        <Fragment key={`route-${index}`}>
           <Polyline
             positions={route.points}
             pathOptions={{
@@ -300,7 +294,7 @@ function VesselRoutes({ visible }) {
               dashArray: "5 8",
             }}
           />
-        </React.Fragment>
+        </Fragment>
       ))}
     </>
   );

@@ -1,12 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Upload,
   Satellite,
   MapPin,
   FileText,
   Zap,
-  CheckCircle2,
   Image as ImageIcon,
   X,
   ArrowRight,

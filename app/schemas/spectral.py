@@ -1,4 +1,6 @@
 from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -13,21 +15,27 @@ class OilCategory(str, Enum):
 class SpectralResultCreate(BaseModel):
     """Submitted by the ML team once spectral analysis is run on an incident."""
 
-    spectral_features: str = Field(
+    spectral_features: dict[str, Any] | str = Field(
         ...,
-        description="Free-text or JSON-encoded summary of extracted spectral features",
+        description="Extracted spectral features as JSON data or JSON-encoded text",
     )
-    probable_oil_category: OilCategory
+
+    probable_oil_category: str = Field(
+        ...,
+        description="ML-derived probable oil category",
+    )
+
     spectral_score: float = Field(
         ...,
         ge=0,
-        le=1,
-        description="ML model's confidence in the category",
+        description="ML model spectral confidence/score",
     )
 
 
 class SpectralResult(SpectralResultCreate):
-    incident_id: str
+    """Full spectral analysis record from PostgreSQL."""
+
+    incident_id: int
 
 
 class CargoCompatibilityCheck(BaseModel):
@@ -35,5 +43,5 @@ class CargoCompatibilityCheck(BaseModel):
 
     mmsi: str
     vessel_cargo_category: str
-    probable_oil_category: OilCategory
+    probable_oil_category: str
     cargo_score: float = Field(..., ge=0, le=1)

@@ -1,12 +1,10 @@
-import React, {
+import {
   useMemo,
 } from "react";
 
 import {
-  Activity,
   AlertTriangle,
   ArrowLeft,
-  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -44,22 +42,6 @@ import {
 /* =========================================================
    HELPERS
 ========================================================= */
-
-function parseDate(item) {
-  const raw =
-    item?.detectedAt ||
-    item?.createdAt ||
-    item?.date ||
-    item?.timestamp;
-
-  if (!raw) return new Date();
-
-  const d = new Date(raw);
-
-  return Number.isNaN(d.getTime())
-    ? new Date()
-    : d;
-}
 
 function formatDate(value) {
   const d = new Date(value);
@@ -459,9 +441,7 @@ function DataCell({
    TIMELINE
 ========================================================= */
 
-function IntelligenceTimeline({
-  inspection,
-}) {
+function IntelligenceTimeline() {
   const events = [
     {
       time: "T−14h",

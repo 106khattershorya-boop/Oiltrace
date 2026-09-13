@@ -15,9 +15,13 @@ router = APIRouter(
     "/{incident_id}/investigation",
     response_model=InvestigationReport,
 )
-def get_investigation(incident_id: str):
+def get_investigation(
+    incident_id: int,
+):
 
-    incident = memory_store.get_incident(incident_id)
+    incident = memory_store.get_incident(
+        incident_id
+    )
 
     if incident is None:
         raise HTTPException(

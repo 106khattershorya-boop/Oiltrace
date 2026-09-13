@@ -1,5 +1,3 @@
-import React from "react";
-
 import {
   ArrowUpRight,
   Ship,
@@ -7,38 +5,28 @@ import {
 
 import RiskBadge from "./RiskBadge";
 
-const vessels = [
-  {
-    name: "MV Ocean Pioneer",
-    imo: "IMO 9876543",
-    type: "Oil Tanker",
-    distance: "7.2 km",
-    risk: "CRITICAL",
-  },
-  {
-    name: "MT Blue Horizon",
-    imo: "IMO 9123456",
-    type: "Chemical Tanker",
-    distance: "12.8 km",
-    risk: "HIGH",
-  },
-  {
-    name: "MV Eastern Star",
-    imo: "IMO 9345678",
-    type: "Cargo Vessel",
-    distance: "18.6 km",
-    risk: "HIGH",
-  },
-  {
-    name: "MT Coastal Trader",
-    imo: "IMO 9456123",
-    type: "Oil Tanker",
-    distance: "26.4 km",
-    risk: "MEDIUM",
-  },
-];
+export default function VesselTable({ vessels = [] }) {
+  const displayVessels = vessels.slice(0, 5).map((vessel, index) => {
+    const name = vessel.vessel_name || vessel.name || "Unknown Vessel";
+    const identifier = vessel.mmsi
+      ? `MMSI ${vessel.mmsi}`
+      : vessel.imo || `Vessel #${index + 1}`;
+    const type = vessel.vessel_type || vessel.type || "AIS vessel";
+    const distance =
+      vessel.distance_km != null
+        ? `${Number(vessel.distance_km).toFixed(2)} km`
+        : vessel.distance || "Unavailable";
+    const risk = vessel.priority_level || vessel.risk || "LOW";
 
-export default function VesselTable() {
+    return {
+      key: vessel.mmsi || vessel.imo || `${name}-${index}`,
+      name,
+      identifier,
+      type,
+      distance,
+      risk,
+    };
+  });
 
   return (
     <div className="glass overflow-hidden rounded-2xl">
@@ -69,35 +57,28 @@ export default function VesselTable() {
       </div>
 
       <div className="divide-y divide-white/[.04]">
-
-        {vessels.map((vessel) => (
+        {displayVessels.map((vessel) => (
           <div
-            key={vessel.imo}
+            key={vessel.key}
             className="group flex items-center justify-between gap-4 px-5 py-4 transition hover:bg-white/[.025]"
           >
-
             <div className="flex min-w-0 items-center gap-3">
-
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-400">
                 <Ship size={16} />
               </div>
 
               <div className="min-w-0">
-
                 <p className="truncate text-xs font-bold text-slate-200">
                   {vessel.name}
                 </p>
 
                 <p className="mt-1 text-[9px] text-slate-600">
-                  {vessel.imo} • {vessel.type}
+                  {vessel.identifier} • {vessel.type}
                 </p>
-
               </div>
-
             </div>
 
             <div className="hidden text-right sm:block">
-
               <p className="text-[9px] uppercase text-slate-600">
                 Distance
               </p>
@@ -105,7 +86,6 @@ export default function VesselTable() {
               <p className="mt-1 text-xs font-bold text-slate-300">
                 {vessel.distance}
               </p>
-
             </div>
 
             <RiskBadge risk={vessel.risk} />
@@ -114,10 +94,14 @@ export default function VesselTable() {
               size={14}
               className="hidden text-slate-600 transition group-hover:text-cyan-400 sm:block"
             />
-
           </div>
         ))}
 
+        {displayVessels.length === 0 && (
+          <div className="p-6 text-center text-xs text-slate-500">
+            No correlated vessel signals currently available.
+          </div>
+        )}
       </div>
 
     </div>

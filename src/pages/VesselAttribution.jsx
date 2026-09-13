@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { getIncidentInvestigation } from "../Services/api";
+
 import { motion } from "framer-motion";
+
 import {
   Ship,
   Search,
   MapPin,
-  Navigation,
-  Clock3,
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
@@ -18,88 +20,58 @@ import {
   X,
 } from "lucide-react";
 
-const vesselData = [
-  {
-    rank: 1,
-    name: "MV Ocean Pioneer",
-    imo: "IMO 9876543",
-    type: "Oil Tanker",
-    flag: "India",
-    distance: "7.2 km",
-    proximity: 96,
-    timing: 94,
-    trajectory: 91,
-    anomaly: 88,
-    risk: "CRITICAL",
-    speed: "8.4 kn",
-    heading: "072°",
-    lastSeen: "18 min ago",
-  },
-  {
-    rank: 2,
-    name: "MT Blue Horizon",
-    imo: "IMO 9123456",
-    type: "Chemical Tanker",
-    flag: "Singapore",
-    distance: "12.8 km",
-    proximity: 88,
-    timing: 91,
-    trajectory: 86,
-    anomaly: 77,
-    risk: "HIGH",
-    speed: "10.1 kn",
-    heading: "084°",
-    lastSeen: "32 min ago",
-  },
-  {
-    rank: 3,
-    name: "MV Eastern Star",
-    imo: "IMO 9345678",
-    type: "Cargo Vessel",
-    flag: "Panama",
-    distance: "18.6 km",
-    proximity: 81,
-    timing: 85,
-    trajectory: 82,
-    anomaly: 64,
-    risk: "HIGH",
-    speed: "12.2 kn",
-    heading: "067°",
-    lastSeen: "41 min ago",
-  },
-  {
-    rank: 4,
-    name: "MT Coastal Trader",
-    imo: "IMO 9456123",
-    type: "Oil Tanker",
-    flag: "Liberia",
-    distance: "26.4 km",
-    proximity: 72,
-    timing: 79,
-    trajectory: 75,
-    anomaly: 51,
-    risk: "MEDIUM",
-    speed: "9.8 kn",
-    heading: "093°",
-    lastSeen: "58 min ago",
-  },
-  {
-    rank: 5,
-    name: "MV Arabian Pearl",
-    imo: "IMO 9567812",
-    type: "Container Ship",
-    flag: "Malta",
-    distance: "34.9 km",
-    proximity: 61,
-    timing: 68,
-    trajectory: 63,
-    anomaly: 42,
-    risk: "LOW",
-    speed: "15.4 kn",
-    heading: "101°",
-    lastSeen: "1 hr ago",
-  },
-];
+const mapBackendVessel = (vessel, index) => {
+  const reasons = Array.isArray(vessel.reasons) ? vessel.reasons : [];
+
+  const distanceStr =
+    vessel.distance_km != null
+      ? `${Number(vessel.distance_km).toFixed(2)} km`
+      : "Unavailable";
+
+  const proximityVal =
+    vessel.spatial_score != null
+      ? Math.round(Number(vessel.spatial_score))
+      : reasons.some((r) => r.toLowerCase().includes("spatial"))
+        ? 100
+        : 0;
+
+  const timingVal =
+    vessel.temporal_score != null
+      ? Math.round(Number(vessel.temporal_score))
+      : reasons.some((r) => r.toLowerCase().includes("temporal"))
+        ? 100
+        : 0;
+
+  const trajectoryVal =
+    vessel.trajectory_score != null
+      ? Math.round(Number(vessel.trajectory_score))
+      : Math.round(Number(vessel.combined_score || 0) * 100);
+
+  const lastSeenStr =
+    vessel.time_difference_minutes != null
+      ? `${Math.round(Number(vessel.time_difference_minutes))} min delta`
+      : "Investigation window";
+
+  return {
+    rank: index + 1,
+    name: vessel.vessel_name || "Unknown Vessel",
+    imo: `MMSI ${vessel.mmsi || "—"}`,
+    type: "AIS vessel",
+    flag: "—",
+    distance: distanceStr,
+    proximity: proximityVal,
+    timing: timingVal,
+    trajectory: trajectoryVal,
+    anomaly: Number(vessel.behaviour_score || 0),
+    risk: vessel.priority_level || "LOW",
+    speed: "Unavailable",
+    heading: "Unavailable",
+    lastSeen: lastSeenStr,
+    combinedScore: Number(vessel.combined_score || 0),
+    finalPriority: Number(vessel.final_priority_score || 0),
+    reasons,
+  };
+};
 
 const riskStyles = {
   CRITICAL:
@@ -112,20 +84,28 @@ const riskStyles = {
     "border-emerald-400/20 bg-emerald-400/10 text-emerald-400",
 };
 
-function ScoreBar({ label, value }) {
+function ScoreBar({ label, value, suffix = "%" }) {
+  const numericValue = Number(value) || 0;
+  const barWidth =
+    suffix === ""
+      ? Math.min(Math.max(numericValue * 5, 0), 100)
+      : Math.min(Math.max(numericValue, 0), 100);
+
   return (
     <div>
       <div className="mb-1.5 flex justify-between text-[9px]">
         <span className="text-slate-600">{label}</span>
+
         <span className="font-semibold text-slate-400">
-          {value}%
+          {value}
+          {suffix}
         </span>
       </div>
 
       <div className="h-1 overflow-hidden rounded-full bg-white/5">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
+          animate={{ width: `${barWidth}%` }}
           transition={{ duration: 0.7 }}
           className="h-full rounded-full bg-cyan-400"
         />
@@ -135,16 +115,70 @@ function ScoreBar({ label, value }) {
 }
 
 export default function VesselAttribution() {
+  const [incident, setIncident] = useState(null);
+  const [vesselData, setVesselData] = useState([]);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState("All");
   const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadInvestigation() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const data = await getIncidentInvestigation(1);
+
+        if (ignore) return;
+
+        setIncident(data?.incident || null);
+
+        const ranked = Array.isArray(data?.ranked_vessels)
+          ? data.ranked_vessels
+          : [];
+
+        setVesselData(
+          ranked.map(mapBackendVessel)
+        );
+      } catch (err) {
+        if (!ignore) {
+          console.error(
+            "Oiltrace investigation API failed:",
+            err
+          );
+
+          setError(
+            "Unable to load live investigation data."
+          );
+
+          setVesselData([]);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadInvestigation();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   const filteredVessels = useMemo(() => {
     return vesselData.filter((vessel) => {
+      const query = search.toLowerCase();
+
       const searchMatch =
-        vessel.name.toLowerCase().includes(search.toLowerCase()) ||
-        vessel.imo.toLowerCase().includes(search.toLowerCase()) ||
-        vessel.type.toLowerCase().includes(search.toLowerCase());
+        vessel.name.toLowerCase().includes(query) ||
+        vessel.imo.toLowerCase().includes(query) ||
+        vessel.type.toLowerCase().includes(query);
 
       const riskMatch =
         riskFilter === "All" ||
@@ -152,12 +186,38 @@ export default function VesselAttribution() {
 
       return searchMatch && riskMatch;
     });
-  }, [search, riskFilter]);
+  }, [vesselData, search, riskFilter]);
+
+  const highRelevanceCount = vesselData.filter(
+    (vessel) =>
+      vessel.risk === "HIGH" ||
+      vessel.risk === "CRITICAL"
+  ).length;
+
+  const topTrajectory = vesselData[0]
+    ? `${vesselData[0].trajectory}%`
+    : "—";
+
+  const topCombinedScore = vesselData[0]
+    ? `${Math.round(vesselData[0].combinedScore * 100)}%`
+    : "—";
+
+  const originLocation =
+    incident?.location_name ||
+    (incident?.latitude != null ? "Gulf of Mexico / Coast" : "Unavailable");
+
+  const latNum = incident?.latitude != null ? Number(incident.latitude) : null;
+  const lonNum = incident?.longitude != null ? Number(incident.longitude) : null;
+  const originCoords =
+    latNum != null && lonNum != null
+      ? `${Math.abs(latNum).toFixed(4)}° ${latNum >= 0 ? "N" : "S"}, ${Math.abs(lonNum).toFixed(4)}° ${lonNum >= 0 ? "E" : "W"}`
+      : "Unavailable";
 
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute left-0 top-20 h-96 w-96 rounded-full bg-cyan-500/5 blur-3xl" />
+
         <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-blue-500/5 blur-3xl" />
       </div>
 
@@ -179,8 +239,8 @@ export default function VesselAttribution() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Correlate historical AIS traffic with the estimated spill origin
-              and rank vessels by investigation relevance.
+              Correlate historical AIS traffic with the estimated spill
+              origin and rank vessels by investigation relevance.
             </p>
           </div>
 
@@ -214,11 +274,11 @@ export default function VesselAttribution() {
                 </p>
 
                 <p className="mt-1 text-lg font-bold">
-                  Arabian Sea
+                  {originLocation}
                 </p>
 
                 <p className="mt-1 text-xs text-cyan-400">
-                  18.742° N, 72.913° E
+                  {originCoords}
                 </p>
               </div>
             </div>
@@ -227,8 +287,8 @@ export default function VesselAttribution() {
               {[
                 ["Time Window", "08–14 hr"],
                 ["Radius", "50 km"],
-                ["Vessels", "42"],
-                ["Ranked", "05"],
+                ["Vessels", vesselData.length || "—"],
+                ["Ranked", vesselData.length || "—"],
               ].map(([label, value]) => (
                 <div
                   key={label}
@@ -250,10 +310,30 @@ export default function VesselAttribution() {
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            ["Traffic Analysed", "42", Ship, "Historical AIS"],
-            ["High Relevance", "03", ShieldAlert, "Priority review"],
-            ["Trajectory Match", "91.4%", Route, "Top vessel"],
-            ["Data Confidence", "96.2%", CheckCircle2, "Correlation model"],
+            [
+              "Traffic Analysed",
+              vesselData.length || "—",
+              Ship,
+              "Live investigation",
+            ],
+            [
+              "High Relevance",
+              highRelevanceCount,
+              ShieldAlert,
+              "Priority review",
+            ],
+            [
+              "Trajectory Match",
+              topTrajectory,
+              Route,
+              "Top vessel",
+            ],
+            [
+              "Combined Score",
+              topCombinedScore,
+              CheckCircle2,
+              "Top ranked vessel",
+            ],
           ].map(([label, value, Icon, sub], index) => (
             <motion.div
               key={label}
@@ -294,7 +374,7 @@ export default function VesselAttribution() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search vessel name, IMO number or vessel type..."
+              placeholder="Search vessel name, MMSI number or vessel type..."
               className="h-11 w-full rounded-xl border border-white/10 bg-black/10 pl-11 pr-4 text-sm text-slate-300 outline-none placeholder:text-slate-700 focus:border-cyan-400/40"
             />
           </div>
@@ -316,119 +396,161 @@ export default function VesselAttribution() {
           </div>
         </div>
 
-        {/* Vessel list */}
-        <div className="space-y-3">
-          {filteredVessels.map((vessel, index) => (
-            <motion.div
-              key={vessel.imo}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl transition hover:border-cyan-400/20"
-            >
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
-                {/* Rank */}
-                <div className="flex items-center gap-4 xl:w-[300px]">
-                  <div
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold ${
-                      vessel.rank === 1
-                        ? "border-red-400/30 bg-red-400/10 text-red-400"
-                        : "border-white/10 bg-white/[0.03] text-slate-400"
-                    }`}
-                  >
-                    #{vessel.rank}
-                  </div>
+        {/* Loading state */}
+        {loading && (
+          <div className="rounded-3xl border border-cyan-400/10 bg-cyan-400/[0.03] py-16 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-cyan-400/20 border-t-cyan-400" />
 
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="truncate font-semibold text-slate-200">
-                        {vessel.name}
-                      </h3>
+            <p className="mt-4 text-sm font-semibold text-slate-300">
+              Loading live AIS investigation...
+            </p>
 
-                      <span
-                        className={`rounded-full border px-2 py-1 text-[8px] font-bold ${riskStyles[vessel.risk]}`}
-                      >
-                        {vessel.risk}
-                      </span>
-                    </div>
+            <p className="mt-1 text-xs text-slate-600">
+              Correlating vessels with the investigation data.
+            </p>
+          </div>
+        )}
 
-                    <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-600">
-                      <span>{vessel.imo}</span>
-                      <span>{vessel.type}</span>
-                      <span>{vessel.flag}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Distance */}
-                <div className="flex items-center gap-3 xl:w-[150px]">
-                  <div className="rounded-xl bg-cyan-400/10 p-2 text-cyan-400">
-                    <MapPin size={16} />
-                  </div>
-
-                  <div>
-                    <p className="text-[9px] uppercase text-slate-600">
-                      Origin Distance
-                    </p>
-
-                    <p className="mt-1 text-sm font-bold">
-                      {vessel.distance}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Scores */}
-                <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <ScoreBar
-                    label="Proximity"
-                    value={vessel.proximity}
-                  />
-
-                  <ScoreBar
-                    label="Timing"
-                    value={vessel.timing}
-                  />
-
-                  <ScoreBar
-                    label="Trajectory"
-                    value={vessel.trajectory}
-                  />
-
-                  <ScoreBar
-                    label="Anomaly"
-                    value={vessel.anomaly}
-                  />
-                </div>
-
-                {/* Button */}
-                <button
-                  onClick={() => setSelected(vessel)}
-                  className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
-                >
-                  Details
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </motion.div>
-          ))}
-
-          {filteredVessels.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-white/10 py-20 text-center">
-              <Ship
-                size={30}
-                className="mx-auto text-slate-700"
+        {/* Error state */}
+        {!loading && error && (
+          <div className="rounded-3xl border border-red-400/20 bg-red-400/[0.04] p-5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle
+                size={18}
+                className="mt-0.5 shrink-0 text-red-400"
               />
 
-              <p className="mt-4 text-sm font-semibold text-slate-400">
-                No matching vessels
-              </p>
+              <div>
+                <p className="text-sm font-semibold text-red-300">
+                  Live investigation unavailable
+                </p>
 
-              <p className="mt-1 text-xs text-slate-700">
-                Try changing your search or risk filter.
-              </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {error}
+                </p>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Vessel list */}
+        {!loading && !error && (
+          <div className="space-y-3">
+            {filteredVessels.map((vessel, index) => (
+              <motion.div
+                key={vessel.imo}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur-xl transition hover:border-cyan-400/20"
+              >
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
+                  {/* Rank */}
+                  <div className="flex items-center gap-4 xl:w-[300px]">
+                    <div
+                      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border text-sm font-bold ${
+                        vessel.rank === 1
+                          ? "border-red-400/30 bg-red-400/10 text-red-400"
+                          : "border-white/10 bg-white/[0.03] text-slate-400"
+                      }`}
+                    >
+                      #{vessel.rank}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="truncate font-semibold text-slate-200">
+                          {vessel.name}
+                        </h3>
+
+                        <span
+                          className={`rounded-full border px-2 py-1 text-[8px] font-bold ${
+                            riskStyles[vessel.risk]
+                          }`}
+                        >
+                          {vessel.risk}
+                        </span>
+                      </div>
+
+                      <div className="mt-1 flex flex-wrap gap-3 text-[10px] text-slate-600">
+                        <span>{vessel.imo}</span>
+                        <span>{vessel.type}</span>
+                        <span>{vessel.flag}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Distance */}
+                  <div className="flex items-center gap-3 xl:w-[150px]">
+                    <div className="rounded-xl bg-cyan-400/10 p-2 text-cyan-400">
+                      <MapPin size={16} />
+                    </div>
+
+                    <div>
+                      <p className="text-[9px] uppercase text-slate-600">
+                        Origin Distance
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold">
+                        {vessel.distance}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Scores */}
+                  <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <ScoreBar
+                      label="Proximity"
+                      value={vessel.proximity}
+                    />
+
+                    <ScoreBar
+                      label="Timing"
+                      value={vessel.timing}
+                    />
+
+                    <ScoreBar
+                      label="Correlation"
+                      value={vessel.trajectory}
+                    />
+
+                    <ScoreBar
+                      label="Behaviour Score"
+                      value={vessel.anomaly}
+                      suffix=""
+                    />
+                  </div>
+
+                  {/* Button */}
+                  <button
+                    onClick={() => setSelected(vessel)}
+                    className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 text-xs font-semibold text-slate-300 transition hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
+                  >
+                    Details
+                    <ChevronRight size={15} />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+
+            {filteredVessels.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-white/10 py-20 text-center">
+                <Ship
+                  size={30}
+                  className="mx-auto text-slate-700"
+                />
+
+                <p className="mt-4 text-sm font-semibold text-slate-400">
+                  No matching vessels
+                </p>
+
+                <p className="mt-1 text-xs text-slate-700">
+                  Try changing your search or risk filter.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Methodology */}
         <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
@@ -540,13 +662,14 @@ export default function VesselAttribution() {
                 />
 
                 <ScoreBar
-                  label="Trajectory Match"
+                  label="Correlation"
                   value={selected.trajectory}
                 />
 
                 <ScoreBar
-                  label="Behavioural Anomaly"
+                  label="Behaviour Score"
                   value={selected.anomaly}
+                  suffix=""
                 />
               </div>
             </div>

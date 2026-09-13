@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "http://192.168.1.87:8000";
+  import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -41,14 +41,8 @@ api.interceptors.response.use(
 // --------------------------------------------------
 
 export const checkServerHealth = async () => {
-  try {
-    const response = await api.get("/");
-
-    return response.data;
-  } catch (error) {
-    console.error("Server health check failed:", error);
-    throw error;
-  }
+  const response = await api.get("/");
+  return response.data;
 };
 
 // --------------------------------------------------
@@ -56,111 +50,104 @@ export const checkServerHealth = async () => {
 // --------------------------------------------------
 
 export const loginUser = async (credentials) => {
-  try {
-    const response = await api.post("/login", credentials);
-
-    return response.data;
-  } catch (error) {
-    console.error("Login failed:", error);
-    throw error;
-  }
+  const response = await api.post("/login", credentials);
+  return response.data;
 };
 
 // --------------------------------------------------
-// Spill Detection
+// Incident APIs
+// --------------------------------------------------
+
+export const getIncident = async (incidentId = 1) => {
+  const response = await api.get(`/incidents/${incidentId}`);
+  return response.data;
+};
+
+export const getIncidentCandidates = async (incidentId = 1) => {
+  const response = await api.get(
+    `/incidents/${incidentId}/candidates`
+  );
+  return response.data;
+};
+
+export const getIncidentEvidence = async (incidentId = 1) => {
+  const response = await api.get(
+    `/incidents/${incidentId}/evidence`
+  );
+  return response.data;
+};
+
+export const getIncidentInvestigation = async (
+  incidentId = 1
+) => {
+  const response = await api.get(
+    `/incidents/${incidentId}/investigation`
+  );
+  return response.data;
+};
+
+// --------------------------------------------------
+// Vessel APIs
+// --------------------------------------------------
+
+export const getVesselBehaviour = async (mmsi) => {
+  const response = await api.get(
+    `/vessels/${mmsi}/behaviour`
+  );
+  return response.data;
+};
+
+export const searchVessels = async (params = {}) => {
+  const response = await api.get("/vessels", {
+    params,
+  });
+
+  return response.data;
+};
+
+// --------------------------------------------------
+// Existing compatibility APIs
 // --------------------------------------------------
 
 export const detectSpill = async (formData) => {
-  try {
-    const response = await api.post(
-      "/detect-spill",
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
+  const response = await api.post(
+    "/detect-spill",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
 
-    return response.data;
-  } catch (error) {
-    console.error("Spill detection failed:", error);
-    throw error;
-  }
+  return response.data;
 };
-
-// --------------------------------------------------
-// Spill Analysis
-// --------------------------------------------------
 
 export const analyzeSpill = async (payload) => {
-  try {
-    const response = await api.post(
-      "/analyze-spill",
-      payload
-    );
+  const response = await api.post(
+    "/analyze-spill",
+    payload
+  );
 
-    return response.data;
-  } catch (error) {
-    console.error("Spill analysis failed:", error);
-    throw error;
-  }
+  return response.data;
 };
-
-// --------------------------------------------------
-// Drift Prediction
-// --------------------------------------------------
 
 export const predictDrift = async (payload) => {
-  try {
-    const response = await api.post(
-      "/predict-drift",
-      payload
-    );
+  const response = await api.post(
+    "/predict-drift",
+    payload
+  );
 
-    return response.data;
-  } catch (error) {
-    console.error("Drift prediction failed:", error);
-    throw error;
-  }
+  return response.data;
 };
-
-// --------------------------------------------------
-// Vessel Attribution
-// --------------------------------------------------
 
 export const attributeVessels = async (payload) => {
-  try {
-    const response = await api.post(
-      "/vessel-attribution",
-      payload
-    );
+  const response = await api.post(
+    "/vessel-attribution",
+    payload
+  );
 
-    return response.data;
-  } catch (error) {
-    console.error("Vessel attribution failed:", error);
-    throw error;
-  }
-};
-
-// --------------------------------------------------
-// AIS Vessel Search
-// --------------------------------------------------
-
-export const searchVessels = async (params = {}) => {
-  try {
-    const response = await api.get(
-      "/vessels",
-      {
-        params,
-      }
-    );
-
-    return response.data;
-  } catch (error) {
-    console.error("Vessel search failed:", error);
-    throw error;
-  }
+  return response.data;
 };
 
 // --------------------------------------------------
@@ -168,41 +155,22 @@ export const searchVessels = async (params = {}) => {
 // --------------------------------------------------
 
 export const generateReport = async (payload) => {
-  try {
-    const response = await api.post(
-      "/reports/generate",
-      payload
-    );
+  const response = await api.post(
+    "/reports/generate",
+    payload
+  );
 
-    return response.data;
-  } catch (error) {
-    console.error("Report generation failed:", error);
-    throw error;
-  }
+  return response.data;
 };
 
 export const getRemoteReports = async () => {
-  try {
-    const response = await api.get("/reports");
-
-    return response.data;
-  } catch (error) {
-    console.error("Fetching reports failed:", error);
-    throw error;
-  }
+  const response = await api.get("/reports");
+  return response.data;
 };
 
 export const getRemoteReportById = async (id) => {
-  try {
-    const response = await api.get(
-      `/reports/${id}`
-    );
-
-    return response.data;
-  } catch (error) {
-    console.error("Fetching report failed:", error);
-    throw error;
-  }
+  const response = await api.get(`/reports/${id}`);
+  return response.data;
 };
 
 // --------------------------------------------------

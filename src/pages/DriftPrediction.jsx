@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Wind,
   Waves,
   Navigation,
   Clock3,
   Target,
-  MapPin,
   Activity,
   Play,
   RotateCcw,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -7,13 +7,11 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronRight,
-  Clock3,
   Crosshair,
   Database,
   Eye,
   FileBarChart2,
   FileText,
-  Layers3,
   Plus,
   Radar,
   Search,
@@ -700,9 +698,8 @@ function GenerationStep({
 export default function Reports() {
   const navigate = useNavigate();
 
-  const [reports, setReports] = useState([]);
-  const [inspections, setInspections] =
-    useState([]);
+  const [reports, setReports] = useState(() => getReports());
+  const [inspections] = useState(() => getInspections());
 
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] =
@@ -724,11 +721,6 @@ export default function Reports() {
 
   const [generationStep, setGenerationStep] =
     useState(0);
-
-  useEffect(() => {
-    setReports(getReports());
-    setInspections(getInspections());
-  }, []);
 
   const stats = useMemo(() => {
     const totalArea =

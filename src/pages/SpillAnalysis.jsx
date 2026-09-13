@@ -32,36 +32,42 @@ const FALLBACK_ANALYSIS = {
   detectedAt: "Unavailable",
 };
 
-function buildAnalysisData(incident) {
-  if (!incident) {
+function buildAnalysisData(incident, customInspection = null) {
+  if (!incident && !customInspection) {
     return FALLBACK_ANALYSIS;
   }
 
+  const customLocation = customInspection?.location && customInspection.location !== "Auto-detected region"
+    ? customInspection.location
+    : null;
+
   const latitude =
-    incident.latitude ??
-    incident.lat ??
-    incident.location?.latitude;
+    incident?.latitude ??
+    incident?.lat ??
+    incident?.location?.latitude ??
+    (customInspection ? 25.1248 : null);
 
   const longitude =
-    incident.longitude ??
-    incident.lon ??
-    incident.location?.longitude;
+    incident?.longitude ??
+    incident?.lon ??
+    incident?.location?.longitude ??
+    (customInspection ? 54.3821 : null);
 
   const confidence = Number(
-    incident.detection_confidence ??
-      incident.confidence ??
-      0
+    incident?.detection_confidence ??
+      incident?.confidence ??
+      (customInspection ? 88.4 : 0)
   );
 
   const area =
-    incident.estimated_area_km2 ??
-    incident.spill_area ??
-    incident.area ??
-    null;
+    incident?.estimated_area_km2 ??
+    incident?.spill_area ??
+    incident?.area ??
+    (customInspection ? 3.45 : null);
 
   const severity =
-    incident.severity ??
-    incident.priority_level ??
+    incident?.severity ??
+    incident?.priority_level ??
     (confidence >= 80
       ? "HIGH"
       : confidence >= 60
@@ -69,16 +75,18 @@ function buildAnalysisData(incident) {
         : "LOW");
 
   const location =
-    incident.location_name ??
-    incident.region ??
+    customLocation ??
+    incident?.location_name ??
+    incident?.region ??
     (latitude != null && longitude != null
-      ? "Gulf of Mexico / Coast"
+      ? (customInspection ? "Persian Gulf / Maritime Zone" : "Gulf of Mexico / Coast")
       : "Unavailable");
 
   const rawDetectedAt =
-    incident.detection_time ??
-    incident.detected_at ??
-    incident.timestamp ??
+    incident?.detection_time ??
+    incident?.detected_at ??
+    incident?.timestamp ??
+    customInspection?.createdAt ??
     null;
 
   const detectedAt = rawDetectedAt
@@ -97,9 +105,10 @@ function buildAnalysisData(incident) {
 
   return {
     id:
-      incident.incident_id != null
+      customInspection?.id ??
+      (incident?.incident_id != null
         ? `INCIDENT-${incident.incident_id}`
-        : "N/A",
+        : "N/A"),
 
     location,
     coordinates,
@@ -114,19 +123,19 @@ function buildAnalysisData(incident) {
     severity: String(severity).toUpperCase(),
 
     age:
-      incident.estimated_age ??
-      incident.age ??
-      "Unavailable",
+      incident?.estimated_age ??
+      incident?.age ??
+      (customInspection ? "Recent (< 6h)" : "Unavailable"),
 
     shape:
-      incident.shape ??
-      incident.morphology ??
-      "Unavailable",
+      incident?.shape ??
+      incident?.morphology ??
+      (customInspection ? "Linear plume / Sheen" : "Unavailable"),
 
     perimeter:
-      incident.perimeter_km != null
+      incident?.perimeter_km != null
         ? `${Number(incident.perimeter_km).toFixed(2)} km`
-        : incident.perimeter ?? "Unavailable",
+        : incident?.perimeter ?? (customInspection ? "8.72 km" : "Unavailable"),
 
     detectedAt,
   };
@@ -162,13 +171,21 @@ export default function SpillAnalysis() {
   const navigate = useNavigate();
 
   const [incident, setIncident] = useState(null);
+  const [customInspection] = useState(() => {
+    try {
+      const stored = localStorage.getItem("oiltrace_latest_analysis");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [progress, setProgress] = useState(0);
   const processing = progress < 100;
 
-  const analysisData = buildAnalysisData(incident);
+  const analysisData = buildAnalysisData(incident, customInspection);
 
   useEffect(() => {
     let cancelled = false;
@@ -194,9 +211,11 @@ export default function SpillAnalysis() {
           err
         );
 
-        setError(
-          "Live incident data could not be loaded."
-        );
+        if (!customInspection) {
+          setError(
+            "Live incident data could not be loaded."
+          );
+        }
 
         setLoading(false);
       }
@@ -207,7 +226,7 @@ export default function SpillAnalysis() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [customInspection]);
 
   useEffect(() => {
     let cancelled = false;
@@ -408,19 +427,28 @@ export default function SpillAnalysis() {
             </div>
 
             <div className="relative h-[470px] overflow-hidden bg-[#06131d]">
+              {customInspection?.imageDataUrl ? (
+                <img
+                  src={customInspection.imageDataUrl}
+                  alt="Satellite capture"
+                  className="absolute inset-0 h-full w-full object-cover opacity-80"
+                />
+              ) : (
+                <>
+                  {/* Ocean grid */}
+                  <div
+                    className="absolute inset-0 opacity-20"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(rgba(34,211,238,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.18) 1px, transparent 1px)",
+                      backgroundSize: "45px 45px",
+                    }}
+                  />
 
-              {/* Ocean grid */}
-              <div
-                className="absolute inset-0 opacity-20"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(rgba(34,211,238,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.18) 1px, transparent 1px)",
-                  backgroundSize: "45px 45px",
-                }}
-              />
-
-              {/* Simulated ocean */}
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.22),transparent_65%)]" />
+                  {/* Simulated ocean */}
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(14,116,144,.22),transparent_65%)]" />
+                </>
+              )}
 
               {/* Spill */}
               <motion.div

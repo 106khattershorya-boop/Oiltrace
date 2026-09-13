@@ -44,7 +44,31 @@ const NewAnalysis = () => {
 
     setLoading(true);
 
-    setTimeout(() => {
+    const firstFile = files[0];
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const inspection = {
+        id: `OT-${Date.now()}`,
+        category,
+        location: location || "Auto-detected region",
+        remarks,
+        images: files.map((file) => file.name),
+        imageDataUrl: reader.result,
+        createdAt: new Date().toISOString(),
+        status: "Processing",
+      };
+
+      localStorage.setItem(
+        "oiltrace_latest_analysis",
+        JSON.stringify(inspection)
+      );
+
+      setLoading(false);
+      navigate("/analysis/spill");
+    };
+
+    reader.onerror = () => {
       const inspection = {
         id: `OT-${Date.now()}`,
         category,
@@ -62,7 +86,9 @@ const NewAnalysis = () => {
 
       setLoading(false);
       navigate("/analysis/spill");
-    }, 1200);
+    };
+
+    reader.readAsDataURL(firstFile);
   };
 
   return (

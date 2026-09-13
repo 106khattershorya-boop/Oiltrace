@@ -1,8 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.behaviour import BehaviourAnalysis
-from app.services import behaviour as behaviour_service
-from app.storage import vessel_store
+from app.storage import behaviour_store
 
 
 router = APIRouter(
@@ -15,18 +14,18 @@ router = APIRouter(
     "/{mmsi}/behaviour",
     response_model=BehaviourAnalysis,
 )
-def get_vessel_behaviour(mmsi: str):
-    reports = vessel_store.list_reports_by_mmsi(mmsi)
+def get_vessel_behaviour(
+    mmsi: str,
+):
 
-    if not reports:
+    result = behaviour_store.get_latest_behaviour(
+        mmsi
+    )
+
+    if result is None:
         raise HTTPException(
             status_code=404,
-            detail="No AIS reports found for this vessel",
+            detail="Behaviour analysis not found",
         )
 
-    vessel_name = reports[0].vessel_name
-
-    return behaviour_service.analyze_behaviour(
-        mmsi,
-        vessel_name,
-    )
+    return result

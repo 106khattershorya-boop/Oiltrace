@@ -22,3 +22,8 @@ class VesselPriority(BaseModel):
     behaviour_score: float
     spectral_score: float | None = None
     cargo_score: float | None = None
+    distance_km: float | None = None
+    time_difference_minutes: float | None = None
+    spatial_score: float | None = None
+    temporal_score: float | None = None
+    trajectory_score: float | None = None

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.priority import VesselPriority
-from app.services import evidence as evidence_service
 from app.services import priority as priority_service
 from app.storage import memory_store
 
@@ -16,9 +15,11 @@ router = APIRouter(
     "/{incident_id}/priority",
     response_model=list[VesselPriority],
 )
-def get_investigation_priority(incident_id: str):
+def get_investigation_priority(incident_id: int):
 
-    incident = memory_store.get_incident(incident_id)
+    incident = memory_store.get_incident(
+        incident_id
+    )
 
     if incident is None:
         raise HTTPException(
@@ -26,6 +27,6 @@ def get_investigation_priority(incident_id: str):
             detail="Incident not found",
         )
 
-    evidence_list = evidence_service.fuse_evidence(incident)
-
-    return priority_service.rank_vessels(evidence_list)
+    return priority_service.rank_vessels(
+        incident.incident_id
+    )

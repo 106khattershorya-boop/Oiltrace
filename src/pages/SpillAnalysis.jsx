@@ -37,35 +37,46 @@ function buildAnalysisData(incident, customInspection = null) {
     return FALLBACK_ANALYSIS;
   }
 
-  const customLocation = customInspection?.location && customInspection.location !== "Auto-detected region"
-    ? customInspection.location
-    : null;
+  const customAnalysis = customInspection?.analysis;
+
+  const customLocation =
+    customInspection?.location &&
+    customInspection.location !== "Auto-detected region"
+      ? customInspection.location
+      : customAnalysis?.sensorType
+        ? `${customAnalysis.sensorType} Zone`
+        : null;
 
   const latitude =
+    customAnalysis?.latitude ??
     incident?.latitude ??
     incident?.lat ??
     incident?.location?.latitude ??
     (customInspection ? 25.1248 : null);
 
   const longitude =
+    customAnalysis?.longitude ??
     incident?.longitude ??
     incident?.lon ??
     incident?.location?.longitude ??
     (customInspection ? 54.3821 : null);
 
   const confidence = Number(
-    incident?.detection_confidence ??
+    customAnalysis?.confidence ??
+      incident?.detection_confidence ??
       incident?.confidence ??
       (customInspection ? 88.4 : 0)
   );
 
   const area =
+    customAnalysis?.estimatedAreaKm2 ??
     incident?.estimated_area_km2 ??
     incident?.spill_area ??
     incident?.area ??
     (customInspection ? 3.45 : null);
 
   const severity =
+    customAnalysis?.severity ??
     incident?.severity ??
     incident?.priority_level ??
     (confidence >= 80
@@ -79,7 +90,7 @@ function buildAnalysisData(incident, customInspection = null) {
     incident?.location_name ??
     incident?.region ??
     (latitude != null && longitude != null
-      ? (customInspection ? "Persian Gulf / Maritime Zone" : "Gulf of Mexico / Coast")
+      ? (customInspection ? "Maritime Observation Zone" : "Gulf of Mexico / Coast")
       : "Unavailable");
 
   const rawDetectedAt =
@@ -125,19 +136,23 @@ function buildAnalysisData(incident, customInspection = null) {
     age:
       incident?.estimated_age ??
       incident?.age ??
-      (customInspection ? "Recent (< 6h)" : "Unavailable"),
+      (customInspection ? "Recent (< 3h)" : "Unavailable"),
 
     shape:
+      customAnalysis?.shape ??
       incident?.shape ??
       incident?.morphology ??
       (customInspection ? "Linear plume / Sheen" : "Unavailable"),
 
     perimeter:
-      incident?.perimeter_km != null
-        ? `${Number(incident.perimeter_km).toFixed(2)} km`
-        : incident?.perimeter ?? (customInspection ? "8.72 km" : "Unavailable"),
+      customAnalysis?.perimeterKm != null
+        ? `${Number(customAnalysis.perimeterKm).toFixed(2)} km`
+        : incident?.perimeter_km != null
+          ? `${Number(incident.perimeter_km).toFixed(2)} km`
+          : incident?.perimeter ?? (customInspection ? "8.72 km" : "Unavailable"),
 
     detectedAt,
+    analysis: customAnalysis,
   };
 }
 
@@ -450,23 +465,69 @@ export default function SpillAnalysis() {
                 </>
               )}
 
-              {/* Spill */}
-              <motion.div
-                animate={{
-                  scale: [1, 1.04, 1],
-                  opacity: [0.72, 0.85, 0.72],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                }}
-                className="absolute left-[43%] top-[43%] h-40 w-64 -rotate-12 rounded-[50%] border border-orange-400/50 bg-orange-500/20 shadow-[0_0_60px_rgba(249,115,22,.18)]"
-              />
+              {/* Dynamic Spill Bounding and Centroid Overlay */}
+              {analysisData?.analysis?.bbox ? (
+                <>
+                  {/* Dynamic Spill Highlight based on detected bounding box */}
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.03, 1],
+                      opacity: [0.75, 0.9, 0.75],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                    }}
+                    className="absolute rounded-2xl border border-orange-400/70 bg-orange-500/25 shadow-[0_0_50px_rgba(249,115,22,.25)]"
+                    style={{
+                      left: `${Math.max(2, Math.min(85, analysisData.analysis.bbox.leftPct))}%`,
+                      top: `${Math.max(2, Math.min(85, analysisData.analysis.bbox.topPct))}%`,
+                      width: `${Math.max(12, Math.min(90, analysisData.analysis.bbox.widthPct))}%`,
+                      height: `${Math.max(12, Math.min(90, analysisData.analysis.bbox.heightPct))}%`,
+                    }}
+                  />
 
-              <div className="absolute left-[48%] top-[45%] h-4 w-4 rounded-full bg-orange-400 shadow-[0_0_25px_rgba(251,146,60,.8)]" />
+                  {/* Centroid core */}
+                  <div
+                    className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-400 shadow-[0_0_25px_rgba(251,146,60,.9)]"
+                    style={{
+                      left: `${Math.max(5, Math.min(95, analysisData.analysis.center.xPct))}%`,
+                      top: `${Math.max(5, Math.min(95, analysisData.analysis.center.yPct))}%`,
+                    }}
+                  />
 
-              {/* Detection boundary */}
-              <div className="absolute left-[37%] top-[35%] h-56 w-[390px] rotate-[-10deg] rounded-[50%] border border-dashed border-cyan-400/50" />
+                  {/* AI Detection Boundary */}
+                  <div
+                    className="absolute rounded-3xl border border-dashed border-cyan-400/60"
+                    style={{
+                      left: `${Math.max(1, analysisData.analysis.bbox.leftPct - 3)}%`,
+                      top: `${Math.max(1, analysisData.analysis.bbox.topPct - 3)}%`,
+                      width: `${Math.min(98, analysisData.analysis.bbox.widthPct + 6)}%`,
+                      height: `${Math.min(98, analysisData.analysis.bbox.heightPct + 6)}%`,
+                    }}
+                  />
+                </>
+              ) : (
+                <>
+                  {/* Fallback Spill */}
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.04, 1],
+                      opacity: [0.72, 0.85, 0.72],
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                    }}
+                    className="absolute left-[43%] top-[43%] h-40 w-64 -rotate-12 rounded-[50%] border border-orange-400/50 bg-orange-500/20 shadow-[0_0_60px_rgba(249,115,22,.18)]"
+                  />
+
+                  <div className="absolute left-[48%] top-[45%] h-4 w-4 rounded-full bg-orange-400 shadow-[0_0_25px_rgba(251,146,60,.8)]" />
+
+                  {/* Detection boundary */}
+                  <div className="absolute left-[37%] top-[35%] h-56 w-[390px] rotate-[-10deg] rounded-[50%] border border-dashed border-cyan-400/50" />
+                </>
+              )}
 
               {/* Coordinates */}
               <div className="absolute left-5 top-5 rounded-xl border border-white/10 bg-black/30 px-3 py-2 backdrop-blur-md">
